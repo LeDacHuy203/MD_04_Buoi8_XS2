@@ -1,0 +1,51 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: appointment-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/appointment_db
+    username: postgres
+    password: 123
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+resilience4j:
+  # 1. TẦNG NGOÀI CÙNG: RATE LIMITER (Ưu tiên 1)
+  ratelimiter:
+    rate-limiter-aspect-order: 1
+    instances:
+      doctorRateLimiter:
+        limit-for-period: 5           # Tối đa 5 request
+        limit-refresh-period: 10s     # Trong 10 giây
+        timeout-duration: 0s
+
+  # 2. TẦNG THỨ HAI: CIRCUIT BREAKER (Ưu tiên 2)
+  circuitbreaker:
+    circuit-breaker-aspect-order: 2
+    instances:
+      doctorServiceCB:
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 5
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+
+  # 3. TẦNG TRONG CÙNG: RETRY (Ưu tiên 3)
+  retry:
+    retry-aspect-order: 3
+    instances:
+      doctorRetry:
+        max-attempts: 3               # Thử lại tối đa 3 lần
+        wait-duration: 2s             # Cách nhau 2 giây mỗi lần thử
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - java.lang.Exception
+
+logging:
+  level:
+    io:
+      github:
+        resilience4j: DEBUG
